@@ -43,7 +43,7 @@ def finalize(event):
     PATH.clear()
 
 """
-SUBMISSION TO BACKEND
+PLOTTING
 """
 GRAPH_MODE      = 0
 POLYGON_MODE    = 1
@@ -52,20 +52,11 @@ LINESTRING_MODE = 2
 MODE = None
 PREVIOUS = None
 
-def submit(window):
+def plot(window):
     global PREVIOUS, MODE
-
-    # Extract topology graph from drawn paths
-    g = extract_graph(PATHS, 'label')
-    print(descriptor(g))
-
-    # Query database with the extracted graph
-    neighbors = query_database(DATABASE, g, K=50)
-    print(neighbors)
-
     # Plot the extracted graph
     if MODE.get() == GRAPH_MODE:
-        fig = plot_graph(g)
+        fig = plot_graph(extract_graph(PATHS, 'label'))
     elif MODE.get() == POLYGON_MODE:
         fig = plot_polygons(get_polygons(get_line_strings(PATHS)))
     else:
@@ -79,14 +70,23 @@ def submit(window):
     canvas = FigureCanvasTkAgg(fig, master=window)  
     canvas.draw()
 
-    # # Add message to window
-    # message = Label(window, text="Output: ")
-    # message.grid(row = 0, column = 4, columnspan = 3)
-  
     # place the canvas on the Tkinter window
     canvas.get_tk_widget().grid(row = 1, column = 4, columnspan = 3, rowspan = 3)
 
     PREVIOUS = canvas.get_tk_widget()
+
+"""
+CLASSIFICATION
+"""
+
+def submit(window):
+    g = extract_graph(PATHS, 'label')
+
+    results = query_database(DATABASE, g)
+
+    # Add message to window
+    message = Label(window, text=f"Output: {results}")
+    message.grid(row = 4, column = 0, columnspan = 3)
 
 """
 WINDOW AND CANVAS
@@ -108,8 +108,8 @@ def create_window():
     # Set default output mode
     MODE = IntVar(value=GRAPH_MODE)
 
-    # Create button to submit drawing
-    b = Button(master, text="Submit", command=lambda: submit(master))
+    # Create button to plot drawing
+    b = Button(master, text="Plot", command=lambda: plot(master))
     b.grid(row = 0, column = 0)
 
     # Create button to clear drawing
@@ -117,7 +117,7 @@ def create_window():
     cb.grid(row = 0, column = 1)
 
     # Create button to exit 
-    eb = Button(master, text="Exit", command=clean_exit)
+    eb = Button(master, text="Submit", command=lambda: submit(master))
     eb.grid(row = 0, column = 2)
 
     # Create canvas

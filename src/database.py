@@ -14,6 +14,8 @@ import random
 
 from scipy.spatial import KDTree
 
+from collections import Counter
+
 
 DATABASE_FILENAME = "db/graphs.db"
 
@@ -47,7 +49,7 @@ class Database:
             self.descriptors = np.array(descriptors)
             self.kdtree = KDTree(self.descriptors)
 
-    def query(self, query_graph, K=50):
+    def query(self, query_graph, K=50, top=5):
         """
         Returns the label from the database using a query graph.
         """
@@ -55,8 +57,6 @@ class Database:
 
         # Query KD-tree
         dd, ii = self.kdtree.query(key, k=K)
-
-        # Plot KNN
 
         neighbors = []
         for i in ii:
@@ -67,7 +67,7 @@ class Database:
             neighbors.append(features)
 
 
-        return neighbors
+        return Counter(neighbors).most_common(top)
     
     def close(self):
         """
@@ -96,11 +96,11 @@ def open_database(N=DESCRIPTOR_SIZE, filename=DATABASE_FILENAME) -> BPlusTree:
     
     return Database(db)
 
-def query_database(db, query, K=50):
+def query_database(db, query, K=50, top=5):
     """
     Returns the label from the database using a query graph.
     """
-    return db.query(query, K=K)
+    return db.query(query, K=K, top=top)
 
 def close_database(db):
     """
