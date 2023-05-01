@@ -40,7 +40,7 @@ def extract_graph(paths, label, step=10) -> nx.Graph:
     centroids = get_centroids(line_strings)
     
     # Use hull to derive adjacency relations
-    hulls = get_hulls(line_strings)
+    polygons = get_polygons(line_strings)
     
     # Create nodes with the following features:
     # - centroid
@@ -50,16 +50,16 @@ def extract_graph(paths, label, step=10) -> nx.Graph:
     # - bounding box area
     # - bounding circle radius
     for i, c in enumerate(centroids):
-        if hulls[i] is not None:
-            length = hulls[i].length
-            area   = hulls[i].area 
+        if polygons[i] is not None:
+            length = polygons[i].length
+            area   = polygons[i].area 
+
+            radius = shapely.minimum_bounding_radius(polygons[i])
             
-            radius = shapely.minimum_bounding_radius(hulls[i])
-            
-            minx, miny, maxx, maxy = hulls[i].bounds
+            minx, miny, maxx, maxy = polygons[i].bounds
             bounds = (maxx - minx)*(maxy - miny)
             
-            num_vertices = (set(hulls[i].boundary.coords))
+            num_vertices = (set(polygons[i].boundary.coords))
             
             G.add_node(i, 
                        position=(c.x, c.y),
@@ -71,8 +71,8 @@ def extract_graph(paths, label, step=10) -> nx.Graph:
                       )
     
     # Create neighbor edges using convex hull intersection
-    for i, j in product(G.nodes, repeat=2):
-        h1, h2 = hulls[i], hulls[j]
+    for i, j in combinations(G.nodes, 2):
+        h1, h2 = polygons[i], polygons[j]
         if i != j and h1 is not None and h2 is not None:
             if h1.intersects(h2):
                 G.add_edge(i, j, relation='neighbor')
@@ -222,12 +222,12 @@ def get_hulls(line_strings):
             
     return hulls
 
-def filter_polygons(polygons, area):
+def filter_polygons(polygons):
     """
     Filter out all convex hulls that are insignificant, implemented
-    as the area being smaller than a certain threshold, 400*2
+    as the area being smaller than a certain threshold, (20*20)*4
     """
-    return [p if p is not None and ((p.area / area)*(800**2))/(20**2) > 6 else None for p in polygons ]
+    return [p if p is not None and p.area > 400*4 else None for p in polygons ]
 
 def get_polygons(line_strings):
     """
