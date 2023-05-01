@@ -8,13 +8,15 @@ from itertools import product, combinations
 
 from numpy import array
 
+DEFAULT_STEP = 10
+
 """
 ----------------------------
 -- GRAPH EXTRACTION (on-line)
 ----------------------------
 """
 
-def extract_graph(paths, label, step=10) -> nx.Graph:
+def extract_graph(paths, label, step=DEFAULT_STEP) -> nx.Graph:
     """
     Extract topology and geometry graph from source (image, label) pair.
     
@@ -158,7 +160,7 @@ def plot_line_strings(line_strings):
 ----------------------------
 """
 
-def get_line_strings(paths, step=10):
+def get_line_strings(paths, step=DEFAULT_STEP):
     """
     Converts the paths (list of lists of points) to line strings.
     """
@@ -173,7 +175,7 @@ def get_line_strings(paths, step=10):
         
     return line_strings
 
-def snap_round(path_points, step=20):
+def snap_round(path_points, step=DEFAULT_STEP):
     """
     The snap round algorithm: line segments to a fixed precision grid.
     """
@@ -235,19 +237,11 @@ def get_polygons(line_strings):
 
     Follows the procedure described in Fonseca et al. "Content-based retrieval of technical drawings".
 
-    >    Our algorithm for polygon detection is divided in to five
-    >    major steps. First, we convert the initial drawing or
-    >    sketch in a set of line segments and simplify those.
-    >    Second, we detect line segment intersections and remove
-    >    them by replacing intersected segments by their
-    >    subsegments that contain no intersections. The third
-    >    step creates a graph induced by the non-intersecting line
-    >    segments, where nodes represent endpoints or proper
-    >    intersection points of original line segments and edges
-    >    represent its subsegments. The fourth step computes the
-    >    Minimum Cycle Basis (MCB) of the induced graph.
-    >    Finally, we construct a set of polygons from cycles in the
-    >    MCB and discard small polygons
+    - Convert the initial drawing or sketch in a set of line segments and simplify those.
+    - Detect line segment intersections and remove them by replacing intersected segments by their subsegments that contain no intersections. 
+    - Create a graph induced by the non-intersecting line segments, where nodes represent endpoints or proper intersection points of original line segments and edges.
+    - Compute the Minimum Cycle Basis (MCB) of the induced graph.
+    - Construct a set of polygons from cycles in the MCB and discard small polygons.
 
     Uses the linestring intersection detection code from: https://gis.stackexchange.com/a/423405
     """
@@ -316,22 +310,3 @@ def get_endpoints(ls):
 def get_segments(ls):
     segments = map(shapely.LineString, zip(ls.coords[:-1], ls.coords[1:]))
     return [s for s in segments if s.coords[0] != s.coords[1]]
-
-
-"""
-----------------------------
--- GRAPH EXTRACTION (off-line)
-----------------------------
-"""
-
-def extract_graphs(images):
-    """
-    Extract all graphs from given images.
-    """
-    i = 0
-    graphs = []
-    for img, l in images:
-        graphs.append(extract_graph(img, l))
-        print(i)
-        i += 1
-    return graphs
