@@ -95,8 +95,7 @@ def plot_graph(G):
     
     fig = plt.figure()
     
-
-    title = 'Topology graph' # G.graph['filename']
+    title = 'Topology graph' 
     plt.title(title)
     
     nx.draw(
@@ -109,10 +108,11 @@ def plot_graph(G):
         font_color='red'
     )
     
-    plt.axis('off')
+    # plt.axis('off')
+
+    plt.gca().invert_yaxis()
 
     return fig
-    #plt.show()
 
 def plot_polygons(polygons):
     fig = plt.figure()
@@ -121,8 +121,13 @@ def plot_polygons(polygons):
     plt.title(title)
 
     for p in polygons:
+        if p is None:
+            continue
+        
         x,y = p.exterior.xy
         plt.plot(x,y)
+
+    plt.gca().invert_yaxis()
 
     return fig
 
@@ -135,6 +140,8 @@ def plot_line_strings(line_strings):
     for ls in line_strings:
         x, y = ls.coords.xy
         plt.plot(x, y)
+
+    plt.gca().invert_yaxis()
 
     return fig
 
