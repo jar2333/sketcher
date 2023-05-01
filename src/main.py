@@ -30,10 +30,7 @@ def paint(event, canvas, d=0.5):
 
    x1, y1 = (event.x - d), (event.y - d)
    x2, y2 = (event.x + d), (event.y + d)
-   canvas.create_rectangle(x1, y1, x2, y2,
-                           outline = "black", 
-                           fill = "black"
-                           )
+   canvas.create_rectangle(x1, y1, x2, y2, outline = "black", fill = "black")
 
 def clear(canvas):
     canvas.delete('all')
@@ -55,7 +52,7 @@ def submit(window):
     global PREVIOUS
 
     # Extract topology graph from drawn paths
-    g = extract_graph(PATHS, 'test')
+    g = extract_graph(PATHS, 'label')
     print(descriptor(g))
 
     # Query database with the extracted graph
@@ -72,9 +69,13 @@ def submit(window):
     # create the canvas containing the figure
     canvas = FigureCanvasTkAgg(fig, master=window)  
     canvas.draw()
+
+    # Add message to window
+    message = Label(window, text="Output: ")
+    message.grid(row = 0, column = 4, columnspan = 3)
   
     # place the canvas on the Tkinter window
-    canvas.get_tk_widget().pack(side=LEFT)
+    canvas.get_tk_widget().grid(row = 1, column = 4, columnspan = 3, rowspan = 3)
 
     PREVIOUS = canvas.get_tk_widget()
 
@@ -94,27 +95,24 @@ def create_window():
     master.protocol("WM_DELETE_WINDOW", clean_exit)
 
     # Create button to submit drawing
-    B = Button(master, text="Submit", command=lambda: submit(master))
-    B.pack() #side=RIGHT)
+    b = Button(master, text="Submit", command=lambda: submit(master))
+    b.grid(row = 0, column = 0)
 
     # Create button to clear drawing
-    CB = Button(master, text="Clear", command=lambda: clear(c))
-    CB.pack() #side=RIGHT)
+    cb = Button(master, text="Clear", command=lambda: clear(c))
+    cb.grid(row = 0, column = 1)
 
     # Create button to exit 
-    EB = Button(master, text="Exit", command=clean_exit)
-    EB.pack() #side=RIGHT)
-
-    # Add message to window
-    message = Label(master, text="Press and drag the mouse to draw")
-    message.pack(side=BOTTOM)
+    eb = Button(master, text="Exit", command=clean_exit)
+    eb.grid(row = 0, column = 2)
 
     # Create canvas
     c = Canvas(master, 
+               bg='white',
                width=CANVAS_WIDTH, 
                height=CANVAS_HEIGHT
                )
-    c.pack(expand=YES, fill=BOTH, side=LEFT)
+    c.grid(row = 1, column = 0, columnspan = 3, rowspan = 3)
 
     # Paint on canvas on mouse movement
     c.bind("<B1-Motion>", lambda e: paint(e, c))
