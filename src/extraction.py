@@ -4,7 +4,7 @@ import matplotlib.pyplot as plt
 
 import shapely
 
-from itertools import product
+from itertools import product, combinations
 
 from numpy import array
 
@@ -87,6 +87,12 @@ def extract_graph(paths, label, step=10) -> nx.Graph:
     
     return G
 
+"""
+----------------------------
+-- PLOTTING
+----------------------------
+"""
+
 def plot_graph(G):
     """
     Plot extracted graph.
@@ -123,7 +129,7 @@ def plot_polygons(polygons):
     for p in polygons:
         if p is None:
             continue
-        
+
         x,y = p.exterior.xy
         plt.plot(x,y)
 
@@ -180,30 +186,12 @@ def to_line_string(path_points):
     """
     return shapely.LineString(path_points)
 
-# def filter_linestrings(linestrings):
-#     """
-#     Filter out all linestrings that are insignificant, implemented
-#     as the length being smaller than a certain threshold, 400*2
-#     """
-#     return [l for l in linestrings if l.length > 20*2]
+def filter_line_strings(line_strings):
+    """
+    Filter out all linestrings that are insignificant.
+    """
+    return line_strings
 
-# def get_polygon(ls) -> shapely.Polygon:
-#     s = ls.interpolate(0, normalized=True)
-#     t = ls.interpolate(1, normalized=True)
-
-#     if ls.length > 0 and s.distance(t)/ls.length < 0.5:
-#         return shapely.polygonize([ls, shapely.LineString([s, t])])
-    
-#     return None
-
-# def detect_polygons(line_strings):
-#     """
-#     Detect polygons in the image, from each singular linestring.
-    
-#     Compares the length of the linestring with the distance of the start and end points.
-#     """
-
-#     return [p for ls in line_strings if (p := get_polygon(ls)) != None ]
 
 """
 ----------------------------
@@ -234,21 +222,71 @@ def get_hulls(line_strings):
             
     return hulls
 
-def get_polygons(line_strings):
-    """
-    Extracts polygons from the input strokes.
-
-    TO-DO: IMPLEMENT.
-    """
-    return get_hulls(line_strings)
-
-
 def filter_polygons(polygons, area):
     """
     Filter out all convex hulls that are insignificant, implemented
     as the area being smaller than a certain threshold, 400*2
     """
     return [p if p is not None and ((p.area / area)*(800**2))/(20**2) > 6 else None for p in polygons ]
+
+def get_polygons(line_strings):
+    """
+    Returns the polygons created by the list of line strings.
+
+    Follows the procedure described in Fonseca et al. "Content-based retrieval of technical drawings".
+
+    >    Our algorithm for polygon detection is divided in to five
+    >    major steps. First, we convert the initial drawing or
+    >    sketch in a set of line segments and simplify those.
+    >    Second, we detect line segment intersections and remove
+    >    them by replacing intersected segments by their
+    >    subsegments that contain no intersections. The third
+    >    step creates a graph induced by the non-intersecting line
+    >    segments, where nodes represent endpoints or proper
+    >    intersection points of original line segments and edges
+    >    represent its subsegments. The fourth step computes the
+    >    Minimum Cycle Basis (MCB) of the induced graph.
+    >    Finally, we construct a set of polygons from cycles in the
+    >    MCB and discard small polygons
+
+    Uses the linestring intersection detection code from: https://gis.stackexchange.com/a/423405
+    """
+    segments = []
+    for ls in line_strings:
+        segments += get_segments(ls)
+
+    graph = nx.Graph()
+    for seg1,seg2 in combinations(segments,2):
+        if seg1.crosses(seg2):
+            inter = seg1.intersection(seg2)
+
+            # Dont want to deal with the other cases right now 
+            assert isinstance(inter, shapely.Point)   
+
+            s1, t1 = get_endpoints(seg1)
+            s2, t2 = get_endpoints(seg2)
+
+            graph.add_nodes_from([s1, s2, t1, t2, inter])
+
+            graph.add_edge(s1, inter)
+            graph.add_edge(s2, inter)
+            graph.add_edge(inter, t1)
+            graph.add_edge(inter, t2)
+
+    cycles = nx.minimum_cycle_basis(graph)
+
+    polygons = [shapely.Polygon(c) for c in cycles]
+
+    return polygons
+
+def get_endpoints(ls):
+    """
+    Gets the endpoints of a line string
+    """
+    return ls.interpolate(0, normalized=True), ls.interpolate(1, normalized=True)
+
+def get_segments(ls):
+    return list(map(shapely.LineString, zip(ls.coords[:-1], ls.coords[1:])))
 
 
 """
