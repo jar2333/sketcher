@@ -6,6 +6,8 @@ import shapely
 
 from itertools import product
 
+from numpy import array
+
 """
 ----------------------------
 -- GRAPH EXTRACTION (on-line)
@@ -85,6 +87,33 @@ def extract_graph(paths, label, step=10) -> nx.Graph:
     
     return G
 
+def plot_graph(G):
+    """
+    Plot extracted graph.
+    """
+    pos = nx.get_node_attributes(G,'position')
+    
+    fig = plt.figure()
+    
+
+    title = 'test' # G.graph['filename']
+    plt.title(title)
+    
+    nx.draw(
+        G, pos, edge_color='black', width=1, linewidths=1,
+        node_size=500, node_color='blue', alpha=0.5
+    )
+    nx.draw_networkx_edge_labels(
+        G, pos,
+        edge_labels=nx.get_edge_attributes(G,'relation'),
+        font_color='red'
+    )
+    
+    plt.axis('off')
+
+    return fig
+    #plt.show()
+
 """
 ----------------------------
 -- POINT TO LINESTRING PROCESSING
@@ -110,7 +139,7 @@ def snap_round(path_points, step=20):
     """
     The snap round algorithm: line segments to a fixed precision grid.
     """
-    return (path_points//step)*step
+    return (array(path_points)//step)*step
 
 
 def to_line_string(path_points):
@@ -199,24 +228,3 @@ def extract_graphs(images):
         print(i)
         i += 1
     return graphs
-
-
-def plot_graph(G):
-    pos = nx.get_node_attributes(G,'position')
-    
-    plt.figure()
-    
-    plt.title(G.graph['filename'])
-    
-    nx.draw(
-        G, pos, edge_color='black', width=1, linewidths=1,
-        node_size=500, node_color='blue', alpha=0.5
-    )
-    nx.draw_networkx_edge_labels(
-        G, pos,
-        edge_labels=nx.get_edge_attributes(G,'relation'),
-        font_color='red'
-    )
-    
-    plt.axis('off')
-    plt.show()
