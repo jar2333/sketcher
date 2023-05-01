@@ -120,7 +120,7 @@ def plot_graph(G):
 ----------------------------
 """
 
-def get_line_strings(paths, step=20):
+def get_line_strings(paths, step=10):
     """
     Converts the paths (list of lists of points) to line strings.
     """

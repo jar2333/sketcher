@@ -72,11 +72,11 @@ def create_window():
     
     # Create button to submit drawing
     B = Button(master, text="Submit", command=lambda: submit(master))
-    B.pack()
+    B.pack(side=RIGHT)
 
     # Create button to clear drawing
     CB = Button(master, text="Clear", command=lambda: clear(c))
-    CB.pack()
+    CB.pack(side=RIGHT)
 
 
 def main():
