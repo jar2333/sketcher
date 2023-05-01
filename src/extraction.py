@@ -96,7 +96,7 @@ def plot_graph(G):
     fig = plt.figure()
     
 
-    title = 'test' # G.graph['filename']
+    title = 'Topology graph' # G.graph['filename']
     plt.title(title)
     
     nx.draw(

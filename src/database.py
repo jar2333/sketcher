@@ -12,7 +12,7 @@ import os, errno
 
 import random
 
-# from scipy.spatial import KDTree
+from scipy.spatial import KDTree
 
 
 DATABASE_FILENAME = "db/graphs.db"
@@ -26,6 +26,63 @@ DESCRIPTOR_SIZE = 11
 ------------------------------
 """
 
+class Database:
+    """
+    A database.
+    """
+
+    def __init__(self, bplustree):
+        """
+        Creates a database:
+        - A resource handle for an in-disk B+-tree
+        - An in-memory KD-tree for querying K nearest neighbors, constructed using keys in B+-tree
+        """
+        self.bplustree = bplustree
+
+        descriptors = []
+        try:
+            for d in bplustree:
+                descriptors.append(np.array(d))
+        except: #StopIteration:
+            self.descriptors = np.array(descriptors)
+            self.kdtree = KDTree(self.descriptors)
+
+    def query(self, query_graph, K=50):
+        """
+        Returns the label from the database using a query graph.
+        """
+        key = descriptor(query_graph, N=DESCRIPTOR_SIZE)
+
+        # Query KD-tree
+        dd, ii = self.kdtree.query(key, k=K)
+
+        # Plot KNN
+
+        neighbors = []
+        for i in ii:
+            k = tuple(self.descriptors[i])
+
+            features = self.bplustree.get(k)
+            
+            neighbors.append(features)
+
+
+        return neighbors
+    
+    def close(self):
+        """
+        Closes database.
+        """
+        self.bplustree.close()
+
+    def insert(self, k, v):
+        self.bplustree.insert(k, v)
+    
+    def checkpoint(self):
+        self.bplustree.checkpoint()
+    
+
+
 def open_database(N=DESCRIPTOR_SIZE, filename=DATABASE_FILENAME) -> BPlusTree:
     """
     Create db, with key_size of 8 bytes (C double) times vector size, 
@@ -37,15 +94,13 @@ def open_database(N=DESCRIPTOR_SIZE, filename=DATABASE_FILENAME) -> BPlusTree:
                        page_size=128*8*N,
                        key_size=8*N)
     
-    return db
+    return Database(db)
 
-def query_database(db, query):
+def query_database(db, query, K=50):
     """
     Returns the label from the database using a query graph.
     """
-    key = tuple(descriptor(query, N=DESCRIPTOR_SIZE))
-    
-    return db.get(key)
+    return db.query(query, K=K)
 
 def close_database(db):
     """
@@ -100,11 +155,12 @@ def construct_database(graphs, N=DESCRIPTOR_SIZE, filename=DATABASE_FILENAME) ->
         # Flush
         db.checkpoint()
         
-        return db        
+        return db 
         
     except:
         # DB unexpected error, close.
         db.close()
+
         erase_database(filename)
         raise 
 
