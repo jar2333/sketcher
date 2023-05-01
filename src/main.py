@@ -1,7 +1,7 @@
 from tkinter import *
 from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
 
-from extraction import extract_graph, plot_graph
+from extraction import extract_graph, plot_graph, get_line_strings, plot_line_strings, get_polygons, plot_polygons
 from database import open_database, query_database, close_database, descriptor
 
 """
@@ -45,11 +45,15 @@ def finalize(event):
 """
 SUBMISSION TO BACKEND
 """
+GRAPH_MODE      = 0
+POLYGON_MODE    = 1
+LINESTRING_MODE = 2
 
+MODE = None
 PREVIOUS = None
 
 def submit(window):
-    global PREVIOUS
+    global PREVIOUS, MODE
 
     # Extract topology graph from drawn paths
     g = extract_graph(PATHS, 'label')
@@ -60,7 +64,12 @@ def submit(window):
     print(neighbors)
 
     # Plot the extracted graph
-    fig = plot_graph(g)
+    if MODE.get() == GRAPH_MODE:
+        fig = plot_graph(g)
+    elif MODE.get() == POLYGON_MODE:
+        fig = plot_polygons(get_polygons(get_line_strings(PATHS)))
+    else:
+        fig = plot_line_strings(get_line_strings(PATHS))
 
     # Destroy previous plot
     if PREVIOUS is not None:
@@ -70,9 +79,9 @@ def submit(window):
     canvas = FigureCanvasTkAgg(fig, master=window)  
     canvas.draw()
 
-    # Add message to window
-    message = Label(window, text="Output: ")
-    message.grid(row = 0, column = 4, columnspan = 3)
+    # # Add message to window
+    # message = Label(window, text="Output: ")
+    # message.grid(row = 0, column = 4, columnspan = 3)
   
     # place the canvas on the Tkinter window
     canvas.get_tk_widget().grid(row = 1, column = 4, columnspan = 3, rowspan = 3)
@@ -87,12 +96,17 @@ CANVAS_WIDTH  = 500
 CANVAS_HEIGHT = 500
 
 def create_window():
+    global MODE
+
     # Create window
     master = Tk()
     master.title("Sketching!")
 
     # On window close, exit
     master.protocol("WM_DELETE_WINDOW", clean_exit)
+
+    # Set default output mode
+    MODE = IntVar(value=GRAPH_MODE)
 
     # Create button to submit drawing
     b = Button(master, text="Submit", command=lambda: submit(master))
@@ -119,6 +133,16 @@ def create_window():
 
     # Stop painting on canvas on mouse release
     c.bind("<ButtonRelease-1>", finalize)
+
+    # Radio buttons for output window
+    r1 = Radiobutton(master, text="Graph", variable=MODE, value=GRAPH_MODE)
+    r1.grid(row = 0, column = 4)
+
+    r2 = Radiobutton(master, text="Polygon", variable=MODE, value=POLYGON_MODE)
+    r2.grid(row = 0, column = 5)
+
+    r3 = Radiobutton(master, text="Linestring", variable=MODE, value=LINESTRING_MODE)
+    r3.grid(row = 0, column = 6)
 
 """
 RUNNER

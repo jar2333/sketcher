@@ -114,6 +114,31 @@ def plot_graph(G):
     return fig
     #plt.show()
 
+def plot_polygons(polygons):
+    fig = plt.figure()
+    
+    title = 'Polygons'
+    plt.title(title)
+
+    for p in polygons:
+        x,y = p.exterior.xy
+        plt.plot(x,y)
+
+    return fig
+
+def plot_line_strings(line_strings):
+    fig = plt.figure()
+    
+    title = 'Line strings'
+    plt.title(title)
+
+    for ls in line_strings:
+        x, y = ls.coords.xy
+        plt.plot(x, y)
+
+    return fig
+
+
 """
 ----------------------------
 -- POINT TO LINESTRING PROCESSING
@@ -201,6 +226,14 @@ def get_hulls(line_strings):
             hulls.append(None)
             
     return hulls
+
+def get_polygons(line_strings):
+    """
+    Extracts polygons from the input strokes.
+
+    TO-DO: IMPLEMENT.
+    """
+    return get_hulls(line_strings)
 
 
 def filter_polygons(polygons, area):
