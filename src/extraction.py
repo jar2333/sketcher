@@ -251,33 +251,61 @@ def get_polygons(line_strings):
 
     Uses the linestring intersection detection code from: https://gis.stackexchange.com/a/423405
     """
+    def add_edge_ifneq(g, a, b):
+        if a != b:
+            g.add_edge(a,b)
+            
+    # Process "near-polygons" first
+            
     segments = []
     for ls in line_strings:
-        segments += get_segments(ls)
-
-    graph = nx.Graph()
+        segments += get_segments(detect_approximate_polygon(ls))
+        
+    g = nx.Graph()
+    
     for seg1,seg2 in combinations(segments,2):
-        if seg1.crosses(seg2):
+        if seg1.intersects(seg2):
             inter = seg1.intersection(seg2)
-
-            # Dont want to deal with the other cases right now 
-            assert isinstance(inter, shapely.Point)   
-
+            
             s1, t1 = get_endpoints(seg1)
             s2, t2 = get_endpoints(seg2)
 
-            graph.add_nodes_from([s1, s2, t1, t2, inter])
+            if isinstance(inter, shapely.Point):  
+                g.add_nodes_from([s1, s2, t1, t2, inter])
+                
+                add_edge_ifneq(g, s1, inter)
+                add_edge_ifneq(g, s2, inter)
+                add_edge_ifneq(g, inter, t1)
+                add_edge_ifneq(g, inter, t2)
+            else:
+                i1, i2 = inter.coords
+                
+                g.add_nodes_from([s1, s2, t1, t2, i1, i2])
+                
+                # idk about edges in this case :(
+            
+    cycles = nx.minimum_cycle_basis(g)
 
-            graph.add_edge(s1, inter)
-            graph.add_edge(s2, inter)
-            graph.add_edge(inter, t1)
-            graph.add_edge(inter, t2)
-
-    cycles = nx.minimum_cycle_basis(graph)
-
-    polygons = [shapely.Polygon(c) for c in cycles]
+    polygons = []
+    for c in cycles:
+        lsc = shapely.LineString(c)
+        hull = lsc.convex_hull
+        if isinstance(hull, shapely.Polygon):
+            polygons.append(hull) 
 
     return polygons
+
+def detect_approximate_polygon(ls):
+    s, t = get_endpoints(ls)
+    
+    # If the two end points are very close relative 
+    # to the total length of the linestring, return a closed linestring
+    if s != t and s.distance(t) < ls.length / 10:
+        ring = shapely.LineString(list(ls.coords) + [t, s])
+        return ring
+    
+    # else, return input unmodified
+    return ls
 
 def get_endpoints(ls):
     """
@@ -286,7 +314,8 @@ def get_endpoints(ls):
     return ls.interpolate(0, normalized=True), ls.interpolate(1, normalized=True)
 
 def get_segments(ls):
-    return list(map(shapely.LineString, zip(ls.coords[:-1], ls.coords[1:])))
+    segments = map(shapely.LineString, zip(ls.coords[:-1], ls.coords[1:]))
+    return [s for s in segments if s.coords[0] != s.coords[1]]
 
 
 """
