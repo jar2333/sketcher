@@ -19,7 +19,7 @@ from collections import Counter
 
 DATABASE_FILENAME = "db/graphs.db"
 
-DESCRIPTOR_SIZE = 11
+DESCRIPTOR_SIZE = 7
 
 """
 ------------------------------
@@ -46,6 +46,8 @@ class Database:
             for d in bplustree:
                 descriptors.append(np.array(d))
         except: #StopIteration:
+            assert len(descriptors) > 0
+            
             self.descriptors = np.array(descriptors)
             self.kdtree = KDTree(self.descriptors)
 
@@ -83,7 +85,7 @@ class Database:
     
 
 
-def open_database(N=DESCRIPTOR_SIZE, filename=DATABASE_FILENAME) -> BPlusTree:
+def open_database(N=DESCRIPTOR_SIZE, value_size=250, filename=DATABASE_FILENAME) -> BPlusTree:
     """
     Create db, with key_size of 8 bytes (C double) times vector size, 
     Other parameters to be determined
@@ -91,7 +93,7 @@ def open_database(N=DESCRIPTOR_SIZE, filename=DATABASE_FILENAME) -> BPlusTree:
     db = NeighborBPlusTree(filename, 
                        serializer=VectorSerializer(), 
                        order=64, 
-                       page_size=128*8*N,
+                       page_size=128*(8*N)*(8*value_size),
                        key_size=8*N)
     
     return Database(db)
@@ -116,7 +118,17 @@ def close_database(db):
 ------------------------------
 """
 
-def construct_database(graphs, N=DESCRIPTOR_SIZE, filename=DATABASE_FILENAME) -> BPlusTree:
+def serialize_features(graph) -> bytes:
+    """
+    Converts graph features to a binary format that can be used later.
+    
+    Default implementation is to encode the label string.
+    
+    Instead, one can binarize vertorized features (look at encode graph matching function).
+    """
+    return graph.graph['label'].encode() 
+
+def construct_database(iterator, N=DESCRIPTOR_SIZE, value_size=250, filename=DATABASE_FILENAME, serialize=serialize_features) -> BPlusTree:
     """
     Populates database with all graphs extracted from images, along with image index and label.
     
@@ -134,28 +146,20 @@ def construct_database(graphs, N=DESCRIPTOR_SIZE, filename=DATABASE_FILENAME) ->
     erase_database(filename)
     
     # Create database
-    db = open_database(N=N, filename=filename)
+    db = NeighborBPlusTree(filename, 
+            serializer=VectorSerializer(), 
+            order=64, 
+            page_size=128*(8*N)*(8*value_size),
+            key_size=8*N)
     
     try:
-        # Create iterator for all key/value pairs to be inserted into database
-        iterator = zip(
-                    # All keys
-                    map(lambda g: tuple(descriptor(g, N=N)), graphs),
-
-                    # All values (binary)
-                    map(serialize_features, graphs)
-                    )
-        
         # Insert all key/value pairs into the database
-        for k, v in iterator:
-            assert isinstance(k, tuple)
-            assert isinstance(v, bytes)
-            db.insert(k, v)
+        db.batch_insert(iterator)
 
         # Flush
         db.checkpoint()
         
-        return db 
+        return Database(db) 
         
     except:
         # DB unexpected error, close.
@@ -212,20 +216,6 @@ def descriptor(graph, N=DESCRIPTOR_SIZE):
     else:
         # Truncate
         return spectra[:N]
-    
-
-def serialize_features(graph) -> bytes:
-    """
-    Converts graph features to a binary format that can be used later.
-    
-    Default implementation is to encode the label string.
-    
-    Instead, one can binarize vertorized features (look at encode graph matching function).
-    """
-    return graph.graph['label'].encode() 
-
-def deserialize_features(binary) -> str:
-    return str(binary)
 
 """
 ------------------------------

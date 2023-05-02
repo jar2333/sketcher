@@ -56,7 +56,7 @@ def plot(window):
     global PREVIOUS, MODE
     # Plot the extracted graph
     if MODE.get() == GRAPH_MODE:
-        fig = plot_graph(extract_graph(PATHS, 'label'))
+        fig = plot_graph(extract_graph(PATHS, 'label', check_area=False))
     elif MODE.get() == POLYGON_MODE:
         fig = plot_polygons(get_polygons(get_line_strings(PATHS)))
     else:
@@ -80,7 +80,7 @@ CLASSIFICATION
 """
 
 def submit(window):
-    g = extract_graph(PATHS, 'label')
+    g = extract_graph(PATHS, 'label', check_area=False)
 
     results = query_database(DATABASE, g)
 

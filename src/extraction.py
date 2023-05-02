@@ -16,7 +16,7 @@ DEFAULT_STEP = 20
 ----------------------------
 """
 
-def extract_graph(paths, label, step=DEFAULT_STEP) -> nx.Graph:
+def extract_graph(paths, label, step=DEFAULT_STEP, check_area=True) -> nx.Graph:
     """
     Extract topology and geometry graph from source (image, label) pair.
     
@@ -36,7 +36,7 @@ def extract_graph(paths, label, step=DEFAULT_STEP) -> nx.Graph:
     # Get sketch line strings
     line_strings = get_line_strings(paths, step=step)
 
-    if not is_big_enough(line_strings):
+    if check_area and not is_big_enough(line_strings):
         raise StopIteration
     
     # detect polygons to use as vertices and for adjacency relations
