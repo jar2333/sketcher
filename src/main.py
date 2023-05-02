@@ -100,7 +100,7 @@ def submit(window):
         MSG.destroy()
 
     # Add message to window
-    message = Label(window, text=results)
+    message = Label(window, text=results, font=("Arial", 25))
     message.grid(row = 1, column = 5, columnspan = 3)
 
     MSG = message
