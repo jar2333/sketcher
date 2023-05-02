@@ -21,6 +21,8 @@ DATABASE_FILENAME = "db/graphs.db"
 
 DESCRIPTOR_SIZE = 7
 
+VALUE_SIZE = 25*8
+
 """
 ------------------------------
 -- On-line functions 
@@ -49,6 +51,7 @@ class Database:
             assert len(descriptors) > 0
             
             self.descriptors = np.array(descriptors)
+
             self.kdtree = KDTree(self.descriptors)
 
     def query(self, query_graph, K=50, top=5):
@@ -57,19 +60,31 @@ class Database:
         """
         key = descriptor(query_graph, N=DESCRIPTOR_SIZE)
 
-        # Query KD-tree
+        # Query KD-tree for nearest descriptors
         dd, ii = self.kdtree.query(key, k=K)
 
+
+        # Find the distributions of each of the K nearest descriptors
         neighbors = []
         for i in ii:
             k = tuple(self.descriptors[i])
 
-            features = self.bplustree.get(k)
-            
+            features = self.bplustree.get_closest(k)
+
             neighbors.append(features)
 
+        # Distribution combination procedure
+        arrays = [np.frombuffer(b, dtype=np.int8) for b in neighbors]
 
-        return Counter(neighbors).most_common(top)
+        s = np.zeros(250, dtype=float)
+        for a in arrays:
+            casted = a.astype(float)
+            s += (casted / np.sum(casted))
+
+        s /= len(arrays)
+
+        # Return distribution
+        return s
     
     def close(self):
         """
@@ -84,8 +99,7 @@ class Database:
         self.bplustree.checkpoint()
     
 
-
-def open_database(N=DESCRIPTOR_SIZE, value_size=250, filename=DATABASE_FILENAME) -> BPlusTree:
+def open_database(N=DESCRIPTOR_SIZE, value_size=VALUE_SIZE, filename=DATABASE_FILENAME) -> BPlusTree:
     """
     Create db, with key_size of 8 bytes (C double) times vector size, 
     Other parameters to be determined
@@ -93,7 +107,7 @@ def open_database(N=DESCRIPTOR_SIZE, value_size=250, filename=DATABASE_FILENAME)
     db = NeighborBPlusTree(filename, 
                        serializer=VectorSerializer(), 
                        order=64, 
-                       page_size=128*(8*N)*(8*value_size),
+                       page_size=64*(8*N)*(value_size),
                        key_size=8*N)
     
     return Database(db)
@@ -128,7 +142,7 @@ def serialize_features(graph) -> bytes:
     """
     return graph.graph['label'].encode() 
 
-def construct_database(iterator, N=DESCRIPTOR_SIZE, value_size=250, filename=DATABASE_FILENAME, serialize=serialize_features) -> BPlusTree:
+def construct_database(iterator, N=DESCRIPTOR_SIZE, value_size=VALUE_SIZE, filename=DATABASE_FILENAME) -> BPlusTree:
     """
     Populates database with all graphs extracted from images, along with image index and label.
     
@@ -149,7 +163,7 @@ def construct_database(iterator, N=DESCRIPTOR_SIZE, value_size=250, filename=DAT
     db = NeighborBPlusTree(filename, 
             serializer=VectorSerializer(), 
             order=64, 
-            page_size=128*(8*N)*(8*value_size),
+            page_size=64*(8*N)*(value_size),
             key_size=8*N)
     
     try:
@@ -236,7 +250,21 @@ class NeighborBPlusTree(BPlusTree):
             rv = {r.key: self._get_value_from_record(r) for r in records}
             assert isinstance(rv, dict)
             return rv
-    
+        
+    def get_closest(self, key) -> dict:
+        def closest(key, neighbors):
+            closest = min(neighbors, key=lambda k: linalg.norm(np.array(k)-np.array(key)))
+            return closest
+
+        with self._mem.read_transaction:
+            node = self._search_in_tree(key, self._root_node)
+            records = node.entries
+            rv = {r.key: self._get_value_from_record(r) for r in records}
+            assert isinstance(rv, dict)
+
+            c = closest(key, rv.keys())
+            return rv[c]
+     
     def get_range(self, k_min, k_max, step=0.001, default={}) -> dict:
         with self._mem.read_transaction:
             all_records = []
