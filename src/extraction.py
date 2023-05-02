@@ -8,7 +8,7 @@ from itertools import product, combinations
 
 from numpy import array
 
-DEFAULT_STEP = 10
+DEFAULT_STEP = 20
 
 """
 ----------------------------
@@ -32,18 +32,22 @@ def extract_graph(paths, label, step=DEFAULT_STEP) -> nx.Graph:
     Sousa & Fonseca. “Sketch-Based Retrieval of Drawings using Topological Proximity” :
     - Adjacency: two nodes intersect
     - Composition: a node is contained inside another
-    """
-    G = nx.Graph()
-    
+    """    
     # Get sketch line strings
     line_strings = get_line_strings(paths, step=step)
+
+    if not is_big_enough(line_strings):
+        raise StopIteration
     
-    # Use contour centroids to get node
-    centroids = get_centroids(line_strings)
+    # detect polygons to use as vertices and for adjacency relations
+    polygons = filter_polygons(get_polygons(line_strings), step=step)
+
+    # Use polygon centroids to get node
+    centroids = get_centroids(polygons)
     
-    # Use hull to derive adjacency relations
-    polygons = get_polygons(line_strings)
-    
+    # Create output graph
+    G = nx.Graph()
+
     # Create nodes with the following features:
     # - centroid
     # - number of vertices
@@ -85,7 +89,7 @@ def extract_graph(paths, label, step=DEFAULT_STEP) -> nx.Graph:
     G.graph['label'] = label
 
     # Use python kwargs?
-    # G.graph['filename'] = svg['filename']
+    # G.graph['filename'] = ?
     
     return G
 
@@ -160,6 +164,9 @@ def plot_line_strings(line_strings):
 ----------------------------
 """
 
+def is_big_enough(line_strings):
+    return shapely.box(*shapely.MultiLineString(line_strings).bounds).area > 34_000
+
 def get_line_strings(paths, step=DEFAULT_STEP):
     """
     Converts the paths (list of lists of points) to line strings.
@@ -187,12 +194,6 @@ def to_line_string(path_points):
     Converts a list of lists of control points to a shapely LineString
     """
     return shapely.LineString(path_points)
-
-def filter_line_strings(line_strings):
-    """
-    Filter out all linestrings that are insignificant.
-    """
-    return line_strings
 
 
 """
@@ -224,12 +225,12 @@ def get_hulls(line_strings):
             
     return hulls
 
-def filter_polygons(polygons):
+def filter_polygons(polygons, step=DEFAULT_STEP):
     """
     Filter out all convex hulls that are insignificant, implemented
     as the area being smaller than a certain threshold, (20*20)*4
     """
-    return [p if p is not None and p.area > 400*4 else None for p in polygons ]
+    return [p for p in polygons if p is not None and p.area > (step**2)*4]
 
 def get_polygons(line_strings):
     """
@@ -294,7 +295,7 @@ def detect_approximate_polygon(ls):
     
     # If the two end points are very close relative 
     # to the total length of the linestring, return a closed linestring
-    if s != t and s.distance(t) < ls.length / 10:
+    if s != t and s.distance(t) < ls.length * 0.2:
         ring = shapely.LineString(list(ls.coords) + [t, s])
         return ring
     
