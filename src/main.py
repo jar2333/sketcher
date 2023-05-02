@@ -1,8 +1,12 @@
 from tkinter import *
 from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
+from matplotlib import pyplot as plt
+
+from numpy import argmax
 
 from extraction import extract_graph, plot_graph, get_line_strings, plot_line_strings, get_polygons, plot_polygons
 from database import open_database, query_database, close_database, descriptor
+from labels import LABELS
 
 """
 Adapted from https://python-course.eu/tkinter/canvas-widgets-in-tkinter.php
@@ -71,7 +75,7 @@ def plot(window):
     canvas.draw()
 
     # place the canvas on the Tkinter window
-    canvas.get_tk_widget().grid(row = 1, column = 4, columnspan = 3, rowspan = 3)
+    canvas.get_tk_widget().grid(row = 2, column = 5, columnspan = 2, rowspan = 2)
 
     PREVIOUS = canvas.get_tk_widget()
 
@@ -79,21 +83,54 @@ def plot(window):
 CLASSIFICATION
 """
 
+MSG = None
+
 def submit(window):
+    global PREVIOUS, MSG
+
     g = extract_graph(PATHS, 'label', check_area=False)
 
-    results = query_database(DATABASE, g)
+    dist = query_database(DATABASE, g)
+
+    results = sorted(enumerate(LABELS), key=lambda l: dist[l[0]], reverse=True)
+    results = [f'{i}, {l}: {dist[i]}' for i, l in results]
+    results = '\n'.join(results[0:5])
+
+    if MSG is not None:
+        MSG.destroy()
 
     # Add message to window
-    message = Label(window, text=f"Output: {results}")
-    message.grid(row = 4, column = 0, columnspan = 3)
+    message = Label(window, text=results)
+    message.grid(row = 1, column = 5, columnspan = 3)
+
+    MSG = message
+
+    # Destroy previous plot
+    if PREVIOUS is not None:
+        PREVIOUS.destroy()
+
+    # Figure Size
+    fig = plt.figure()
+    
+    # Horizontal Bar Plot
+    plt.bar(range(len(LABELS)), dist)
+    plt.xticks(range(0, len(LABELS), len(LABELS)//10))
+    
+    # create the canvas containing the figure
+    canvas = FigureCanvasTkAgg(fig, master=window)  
+    canvas.draw()
+
+    # place the canvas on the Tkinter window
+    canvas.get_tk_widget().grid(row = 2, column = 5, columnspan = 2, rowspan = 2)
+
+    PREVIOUS = canvas.get_tk_widget()
 
 """
 WINDOW AND CANVAS
 """
 
-CANVAS_WIDTH  = 500
-CANVAS_HEIGHT = 500
+CANVAS_WIDTH  = 800
+CANVAS_HEIGHT = 800
 
 def create_window():
     global MODE
@@ -136,13 +173,13 @@ def create_window():
 
     # Radio buttons for output window
     r1 = Radiobutton(master, text="Graph", variable=MODE, value=GRAPH_MODE)
-    r1.grid(row = 0, column = 4)
+    r1.grid(row = 1, column = 4)
 
     r2 = Radiobutton(master, text="Polygon", variable=MODE, value=POLYGON_MODE)
-    r2.grid(row = 0, column = 5)
+    r2.grid(row = 2, column = 4)
 
     r3 = Radiobutton(master, text="Linestring", variable=MODE, value=LINESTRING_MODE)
-    r3.grid(row = 0, column = 6)
+    r3.grid(row = 3, column = 4)
 
 """
 RUNNER
