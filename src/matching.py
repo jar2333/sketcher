@@ -76,7 +76,7 @@ def extract_edge_features(graph) -> np.array:
     # ----------------
     
     # Get a 'positions' graph attribute:
-    pos = graph.graph['positions']
+    pos = nx.get_node_attributes(graph,'position')
     
     # Convert position dictionary to numpy array
     pos_arr = position_array(pos)
