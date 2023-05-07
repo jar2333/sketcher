@@ -106,15 +106,13 @@ def position_array(pos):
     return np.array(list(pos.values())).T
 
 
-def plot_graph(G, color='k'):
+def plot_match_graph(G, color='k'):
     """
     Plots a given graph with a 'positions' attribute.
     """
-    assert 'positions' in G.graph
-    
     A = nx.to_numpy_array(G)
     
-    pos = G.graph['positions']
+    pos = nx.get_node_attributes(G,'position')
     pts = position_array(pos)
     plt.scatter(pts[0], pts[1], c='w', edgecolors=color)
 
@@ -123,20 +121,17 @@ def plot_graph(G, color='k'):
 
 
 def plot_mapping(X, graph1, graph2):
-    assert 'positions' in graph1.graph
-    assert 'positions' in graph2.graph
-    
-    pos1 = graph1.graph['positions']
-    pos2 = graph2.graph['positions']
+    pos1 = nx.get_node_attributes(graph1,'position')
+    pos2 = nx.get_node_attributes(graph2,'position')
     
     plt.figure(figsize=(8, 4))
     plt.suptitle('Image Matching Result by RRWM')
 
     ax1 = plt.subplot(1, 2, 1)
-    plot_graph(graph1)
+    plot_match_graph(graph1)
 
     ax2 = plt.subplot(1, 2, 2)
-    plot_graph(graph2)
+    plot_match_graph(graph2)
 
     pts1 = position_array(pos1)
     pts2 = position_array(pos2)
