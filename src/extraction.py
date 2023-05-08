@@ -22,7 +22,7 @@ def label(graph):
     """
     return graph.graph['label']
 
-def extract_graph(paths, label, step=DEFAULT_STEP, check_area=True) -> nx.Graph:
+def extract_graph(line_strings, label, step=DEFAULT_STEP, check_area=True) -> nx.Graph:
     """
     Extract topology and geometry graph from source (image, label) pair.
     
@@ -39,9 +39,6 @@ def extract_graph(paths, label, step=DEFAULT_STEP, check_area=True) -> nx.Graph:
     - Adjacency: two nodes intersect
     - Composition: a node is contained inside another
     """    
-    # Get sketch line strings
-    line_strings = get_line_strings(paths, step=step)
-
     if check_area and not is_big_enough(line_strings):
         raise StopIteration
     
@@ -114,7 +111,7 @@ def plot_graph(G, subtitle=''):
     fig = plt.figure()
     
     title = 'Topology graph' 
-    plt.suptitle(title,fontsize=24, y=1)
+    plt.suptitle(title)
     plt.title(subtitle,fontsize=16)
     
     nx.draw(

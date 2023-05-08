@@ -1,13 +1,19 @@
 from tkinter import *
+from tkinter import ttk
+from tkinter import filedialog as fd
+from tkinter.messagebox import showinfo
+
 from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
 from matplotlib import pyplot as plt
 
 from numpy import argmax
 
-from extraction import extract_graph, plot_graph, get_line_strings, plot_line_strings, get_polygons, plot_polygons
-from database import open_database, query_database, close_database, descriptor
-from vision import get_image_line_strings, load_image
-from labels import LABELS
+from src.vision import *
+from src.svg import *
+from src.extraction import *
+from src.database import *
+from src.matching import *
+from src.labels import LABELS
 
 """
 Adapted from https://python-course.eu/tkinter/canvas-widgets-in-tkinter.php
@@ -57,15 +63,28 @@ LINESTRING_MODE = 2
 MODE = None
 PREVIOUS = None
 
-def plot(window):
+CANVAS_INPUT = 0
+FILE_INPUT = 1
+
+INPUT_MODE = None
+
+def plot(window, paths):
     global PREVIOUS, MODE
+
     # Plot the extracted graph
-    if MODE.get() == GRAPH_MODE:
-        fig = plot_graph(extract_graph(PATHS, 'label', check_area=False))
-    elif MODE.get() == POLYGON_MODE:
-        fig = plot_polygons(get_polygons(get_line_strings(PATHS)))
+    if INPUT_MODE.get() == CANVAS_INPUT:
+        line_strings = get_line_strings(paths)
+        step = 20
     else:
-        fig = plot_line_strings(get_line_strings(PATHS))
+        line_strings = get_image_line_strings(load_image(SELECTED_FILE))
+        step = 40
+
+    if MODE.get() == GRAPH_MODE:
+        fig = plot_graph(extract_graph(line_strings, 'label', check_area=False, step=step))
+    elif MODE.get() == POLYGON_MODE:
+        fig = plot_polygons(get_polygons(line_strings))
+    else:
+        fig = plot_line_strings(line_strings)
 
     # Destroy previous plot
     if PREVIOUS is not None:
@@ -76,7 +95,7 @@ def plot(window):
     canvas.draw()
 
     # place the canvas on the Tkinter window
-    canvas.get_tk_widget().grid(row = 2, column = 5, columnspan = 2, rowspan = 2)
+    canvas.get_tk_widget().grid(row = 2, column = 4, columnspan = 2, rowspan = 2)
 
     PREVIOUS = canvas.get_tk_widget()
 
@@ -86,24 +105,21 @@ CLASSIFICATION
 
 MSG = None
 
-def submit(window):
+def submit(window, line_strings):
     global PREVIOUS, MSG
 
-    g = extract_graph(PATHS, 'label', check_area=False)
+    # PIPELINE
 
-    dist = query_database(DATABASE, g)
+    g = extract_graph(line_strings, 'label', check_area=False)
+    unrefined = query_database(DATABASE, g)
 
-    # results = sorted(enumerate(LABELS), key=lambda l: dist[l[0]], reverse=True)
-    # results = [f'{i}, {l}: {dist[i]}' for i, l in results]
-    # results = '\n'.join(results[0:5])
-    results = None
-
+    results = 'default'
     if MSG is not None:
         MSG.destroy()
 
     # Add message to window
     message = Label(window, text=results, font=("Arial", 25))
-    message.grid(row = 1, column = 5, columnspan = 3)
+    message.grid(row = 6, column = 4, columnspan = 2)
 
     MSG = message
 
@@ -123,9 +139,36 @@ def submit(window):
     canvas.draw()
 
     # place the canvas on the Tkinter window
-    canvas.get_tk_widget().grid(row = 2, column = 5, columnspan = 2, rowspan = 2)
+    canvas.get_tk_widget().grid(row = 2, column = 4, columnspan = 2, rowspan = 2)
 
     PREVIOUS = canvas.get_tk_widget()
+
+"""
+FILE SELECT
+"""
+
+SELECTED_FILE = 'assets/test.png'
+
+def select_file():
+    global SELECTED_FILE
+
+    filetypes = (
+        ('PNG files', '*.png'),
+        ('JPG files', '*.jpg'),
+        ('JPEG files', '*.jpeg')
+    )
+
+    filename = fd.askopenfilename(
+        title='Open an image file',
+        initialdir='.',
+        filetypes=filetypes)
+
+    showinfo(
+        title='Selected File',
+        message=filename
+    )
+
+    SELECTED_FILE = filename
 
 """
 WINDOW AND CANVAS
@@ -135,7 +178,7 @@ CANVAS_WIDTH  = 800
 CANVAS_HEIGHT = 800
 
 def create_window():
-    global MODE
+    global MODE, INPUT_MODE, PATHS, PREVIOUS
 
     # Create window
     master = Tk()
@@ -143,12 +186,17 @@ def create_window():
 
     # On window close, exit
     master.protocol("WM_DELETE_WINDOW", clean_exit)
+    
+    # ---------------
+    # CANVAS
+    # ---------------
 
     # Set default output mode
     MODE = IntVar(value=GRAPH_MODE)
+    INPUT_MODE = IntVar(value=CANVAS_INPUT)
 
     # Create button to plot drawing
-    b = Button(master, text="Plot", command=lambda: plot(master))
+    b = Button(master, text="Plot", command=lambda: plot(master, PATHS))
     b.grid(row = 0, column = 0)
 
     # Create button to clear drawing
@@ -156,7 +204,7 @@ def create_window():
     cb.grid(row = 0, column = 1)
 
     # Create button to exit 
-    eb = Button(master, text="Submit", command=lambda: submit(master))
+    eb = Button(master, text="Submit", command=lambda: submit(master, get_line_strings(PATHS)))
     eb.grid(row = 0, column = 2)
 
     # Create canvas
@@ -182,6 +230,38 @@ def create_window():
 
     r3 = Radiobutton(master, text="Linestring", variable=MODE, value=LINESTRING_MODE)
     r3.grid(row = 1, column = 2)
+
+    # --------------------
+    # File upload
+    # --------------------
+
+    # Add file upload button
+    file_upload = ttk.Button(
+        master,
+        text='Open an image file',
+        command=select_file
+    )
+    file_upload.grid(row = 0, column = 4)
+
+    f = Label(master, text=SELECTED_FILE) #, font=("Times New Roman", 15))
+    f.grid(row = 0, column = 5)
+
+    # Radio buttons for output window
+    o1 = Radiobutton(master, text="Canvas", variable=INPUT_MODE, value=CANVAS_INPUT)
+    o1.grid(row = 1, column = 4)
+
+    o2 = Radiobutton(master, text="File", variable=INPUT_MODE, value=FILE_INPUT)
+    o2.grid(row = 1, column = 5)
+
+    # Put empty placeholder canvas
+    placeholder = Canvas(master, 
+            bg='white',
+            width=600, 
+            height=500
+            )
+    placeholder.grid(row = 2, column = 4, columnspan = 2, rowspan = 2)
+
+    PREVIOUS = placeholder
 
 """
 RUNNER
