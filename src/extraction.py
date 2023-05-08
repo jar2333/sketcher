@@ -99,7 +99,7 @@ def extract_graph(paths, label, step=DEFAULT_STEP, check_area=True) -> nx.Graph:
 ----------------------------
 """
 
-def plot_graph(G):
+def plot_graph(G, subtitle=''):
     """
     Plot extracted graph.
     """
@@ -108,7 +108,8 @@ def plot_graph(G):
     fig = plt.figure()
     
     title = 'Topology graph' 
-    plt.title(title)
+    plt.suptitle(title,fontsize=24, y=1)
+    plt.title(subtitle,fontsize=16)
     
     nx.draw(
         G, pos, edge_color='black', width=1, linewidths=1,
