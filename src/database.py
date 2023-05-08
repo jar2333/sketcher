@@ -46,23 +46,29 @@ class Database:
 
         self.kdtree = KDTree(self.descriptors)
 
-    def query(self, query_graph, K=50, top=5):
+    def query(self, query_graph, K=50, topK=100):
         """
         Returns the label from the database using a query graph.
         """
         key = descriptor(query_graph, N=DESCRIPTOR_SIZE)
 
         # Query KD-tree for nearest descriptors
-        dd, ii = self.kdtree.query(key, k=K)
+        distances, indeces = self.kdtree.query(key, k=K)
 
         # Get the features of the neighbors
-        neighbor_features = []
-        for i in ii:
-            k = self.descriptors[i]
-            features = self.kv[bytes(k)] # returns list of feature, label pairs
-            neighbor_features.append(features)
+        neighbors = []
 
-        return neighbor_features
+        for i in indeces: # assumes they are returned in order of distance
+            k = self.descriptors[i]
+            features = self.kv[bytes(k)] # returns list of graphs
+
+            if len(neighbors) < topK:
+                diff = topK - len(neighbors)
+                neighbors += features[:diff]
+            else:
+                break
+
+        return neighbors
     
     def close(self):
         """

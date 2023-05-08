@@ -129,14 +129,34 @@ def plot_match_graph(G, color='k'):
     Plots a given graph with a 'positions' attribute.
     """
     A = nx.to_numpy_array(G)
-    
-    pos = nx.get_node_attributes(G,'position')
+    if 'positions' in G.graph:
+        pos = G.graph['positions']
+    else:
+        pos = nx.get_node_attributes(G,'position')
+
     pts = position_array(pos)
     plt.scatter(pts[0], pts[1], c='w', edgecolors=color)
 
     for x, y in zip(np.nonzero(A)[0], np.nonzero(A)[1]):
         plt.plot((pts[0, x], pts[0, y]), (pts[1, x], pts[1, y]), color+'-')
 
+def mapping_to_list(X, G1, G2):
+    """
+    Converts a mapping matrix returned by the match solver into a list of matched pairs
+    """
+    vertices1 = list(G1.nodes)
+    vertices2 = list(G2.nodes)
+
+    pairs = []
+
+    for i in range(X.shape[0]): # Assumes 0th axis is G1
+        j = np.argmax(X[i]).item()
+
+        u, v = vertices1[i], vertices2[j]
+
+        pairs.append((u, v))
+
+    return pairs
 
 def plot_mapping(X, graph1, graph2):
     pos1 = nx.get_node_attributes(graph1,'position')
