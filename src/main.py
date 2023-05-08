@@ -92,9 +92,10 @@ def submit(window):
 
     dist = query_database(DATABASE, g)
 
-    results = sorted(enumerate(LABELS), key=lambda l: dist[l[0]], reverse=True)
-    results = [f'{i}, {l}: {dist[i]}' for i, l in results]
-    results = '\n'.join(results[0:5])
+    # results = sorted(enumerate(LABELS), key=lambda l: dist[l[0]], reverse=True)
+    # results = [f'{i}, {l}: {dist[i]}' for i, l in results]
+    # results = '\n'.join(results[0:5])
+    results = None
 
     if MSG is not None:
         MSG.destroy()
@@ -112,9 +113,9 @@ def submit(window):
     # Figure Size
     fig = plt.figure()
     
-    # Horizontal Bar Plot
-    plt.bar(range(len(LABELS)), dist)
-    plt.xticks(range(0, len(LABELS), len(LABELS)//10))
+    # Figure and axis
+    # plt.bar(range(len(LABELS)), dist)
+    # plt.xticks(range(0, len(LABELS), len(LABELS)//10))
     
     # create the canvas containing the figure
     canvas = FigureCanvasTkAgg(fig, master=window)  

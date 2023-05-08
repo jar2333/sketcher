@@ -11,7 +11,7 @@ import functools
 from typing import Optional, Tuple
 
 # from sklearn.decomposition import PCA as PCAdimReduc
-# from sklearn.feature_extraction import DictVectorizer
+from sklearn.feature_extraction import DictVectorizer
 
 pygm.BACKEND = 'numpy' # set numpy as backend for pygmtools
 
@@ -39,7 +39,6 @@ def build_affinity(graph1, graph2) -> np.array:
     gaussian_aff = functools.partial(pygm.utils.gaussian_aff_fn, sigma=1) # set affinity function
     
     return pygm.utils.build_aff_mat(node1, edge1, conn1, node2, edge2, conn2, edge_aff_fn=gaussian_aff)
-
 
 def encode(graph) -> Tuple[np.array, np.array, np.array]:
     """
@@ -70,6 +69,9 @@ def extract_edge_features(graph) -> np.array:
     """
     # Get adjacency matrix from graph
     A = nx.to_numpy_array(graph)
+
+    if not np.any(A): # if all zeros
+        return A
     
     # ----------------
     # Length feature
@@ -99,7 +101,23 @@ def extract_node_features(graph) -> Optional[np.array]:
     Can utilize scikit-learn's feature extraction to vectorize discrete and continuous features:
     https://scikit-learn.org/stable/modules/feature_extraction.html
     """
-    return None
+    if graph.number_of_nodes() == 0:
+        return None
+    
+    vec = DictVectorizer()
+
+    measurements = []
+    for _, attribs in graph.nodes.items():
+        attribs = dict(attribs)
+        a = {f: val for f, val in attribs.items() if f != 'vertices' and f != 'position'}
+
+        c = attribs['position']
+        a["x"] = c[0]
+        a["y"] = c[1]
+
+        measurements.append(a)
+
+    return vec.fit_transform(measurements).toarray()
 
 
 def position_array(pos):

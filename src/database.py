@@ -4,24 +4,16 @@ from scipy import linalg
 
 import networkx as nx
 
-from bplustree import BPlusTree
-from bplustree.serializer import Serializer
-from bplustree.node import Node
-
-import os, errno
-
-import random
-
 from scipy.spatial import KDTree
 
-from collections import Counter
+import pickle
+
+from collections import defaultdict
 
 
 DATABASE_FILENAME = "db/graphs.db"
 
 DESCRIPTOR_SIZE = 7
-
-VALUE_SIZE = 25*8
 
 """
 ------------------------------
@@ -35,24 +27,24 @@ class Database:
     A database.
     """
 
-    def __init__(self, bplustree):
+    def __init__(self, kv, filename=DATABASE_FILENAME):
         """
         Creates a database:
         - A resource handle for an in-disk B+-tree
         - An in-memory KD-tree for querying K nearest neighbors, constructed using keys in B+-tree
         """
-        self.bplustree = bplustree
+        self.filename = filename
+        self.kv = kv
 
         descriptors = []
-        try:
-            for d in bplustree:
-                descriptors.append(np.array(d))
-        except: #StopIteration:
-            assert len(descriptors) > 0
-            
-            self.descriptors = np.array(descriptors)
+        for d in self.kv:
+            descriptors.append(np.frombuffer(d, dtype=float))
 
-            self.kdtree = KDTree(self.descriptors)
+        assert len(descriptors) > 0
+        
+        self.descriptors = np.array(descriptors)
+
+        self.kdtree = KDTree(self.descriptors)
 
     def query(self, query_graph, K=50, top=5):
         """
@@ -63,54 +55,41 @@ class Database:
         # Query KD-tree for nearest descriptors
         dd, ii = self.kdtree.query(key, k=K)
 
-
-        # Find the distributions of each of the K nearest descriptors
-        neighbors = []
+        # Get the features of the neighbors
+        neighbor_features = []
         for i in ii:
-            k = tuple(self.descriptors[i])
+            k = self.descriptors[i]
+            features = self.kv[bytes(k)] # returns list of feature, label pairs
+            neighbor_features.append(features)
 
-            features = self.bplustree.get_closest(k)
-
-            neighbors.append(features)
-
-        # Distribution combination procedure
-        arrays = [np.frombuffer(b, dtype=np.int8) for b in neighbors]
-
-        s = np.zeros(250, dtype=float)
-        for a in arrays:
-            casted = a.astype(float)
-            s += (casted / np.sum(casted))
-
-        s /= len(arrays)
-
-        # Return distribution
-        return s
+        return neighbor_features
     
     def close(self):
         """
         Closes database.
         """
-        self.bplustree.close()
+        self.checkpoint()
 
-    def insert(self, k, v):
-        self.bplustree.insert(k, v)
-    
     def checkpoint(self):
-        self.bplustree.checkpoint()
-    
+        """
+        Saves db to disk
+        """
+        with open(self.filename, 'wb') as f:
+            pickle.dump(self, f)
 
-def open_database(N=DESCRIPTOR_SIZE, value_size=VALUE_SIZE, filename=DATABASE_FILENAME) -> BPlusTree:
+    def insert(self, k: np.array, v):
+        self.kv[bytes(k)].append(v)
+
+    def delete(self, k: np.array):
+        del self.kv[bytes(k)]
+    
+def open_database(filename=DATABASE_FILENAME) -> Database:
     """
     Create db, with key_size of 8 bytes (C double) times vector size, 
     Other parameters to be determined
     """
-    db = NeighborBPlusTree(filename, 
-                       serializer=VectorSerializer(), 
-                       order=64, 
-                       page_size=64*(8*N)*(value_size),
-                       key_size=8*N)
-    
-    return Database(db)
+    with open(filename, 'rb') as f:
+        return pickle.load(f)
 
 def query_database(db, query, K=50, top=5):
     """
@@ -132,62 +111,27 @@ def close_database(db):
 ------------------------------
 """
 
-def serialize_features(graph) -> bytes:
+def construct_database(descriptors, features):
     """
-    Converts graph features to a binary format that can be used later.
-    
-    Default implementation is to encode the label string.
-    
-    Instead, one can binarize vertorized features (look at encode graph matching function).
-    """
-    return graph.graph['label'].encode() 
-
-def construct_database(iterator, N=DESCRIPTOR_SIZE, value_size=VALUE_SIZE, filename=DATABASE_FILENAME) -> BPlusTree:
-    """
-    Populates database with all graphs extracted from images, along with image index and label.
+    Populates database with all graphs extracted from images, using graph descriptors as keys.
     
     Uses the algorithms described in Fonseca and Jorge "Indexing High-Dimensional Data for 
     Content-Based Retrieval in Large Databases".
-    
-    Constructs a B+tree that uses the index described in the paper to map labels, facilitates
-    range queries and KNN queries. 
-    
-    The B+-tree maps the index to graph information, serialized to bytes.
-    
-    TO-DO: change from only encoding label to more graph features!
     """
-    # Delete existing database
-    erase_database(filename)
-    
-    # Create database
-    db = NeighborBPlusTree(filename, 
-            serializer=VectorSerializer(), 
-            order=64, 
-            page_size=64*(8*N)*(value_size),
-            key_size=8*N)
-    
-    try:
-        # Insert all key/value pairs into the database
-        db.batch_insert(iterator)
+    # Create base dictionary
+    kv = defaultdict(list)
 
-        # Flush
-        db.checkpoint()
+    for k, v in zip(descriptors, features):
+        kv[bytes(k)].append(v)
+
+    # Create new Database    
+    db =  Database(kv) 
+
+    # Flush to disk
+    db.checkpoint()
+
+    return db
         
-        return Database(db) 
-        
-    except:
-        # DB unexpected error, close.
-        db.close()
-
-        erase_database(filename)
-        raise 
-
-def erase_database(filename):
-    try:
-        os.remove(filename)
-    except OSError as e:
-        if e.errno != errno.ENOENT:
-            raise
 
 """
 ------------------------------
@@ -230,102 +174,3 @@ def descriptor(graph, N=DESCRIPTOR_SIZE):
     else:
         # Truncate
         return spectra[:N]
-
-"""
-------------------------------
--- Database implementation 
--- (BPlusTree module)
-------------------------------
-"""
-
-class NeighborBPlusTree(BPlusTree): 
-    """
-    A BPlusTree that supports range and neighbor queries.
-    """
-
-    def get_neighbors(self, key, default={}) -> dict:
-        with self._mem.read_transaction:
-            node = self._search_in_tree(key, self._root_node)
-            records = node.entries
-            rv = {r.key: self._get_value_from_record(r) for r in records}
-            assert isinstance(rv, dict)
-            return rv
-        
-    def get_closest(self, key) -> dict:
-        def closest(key, neighbors):
-            closest = min(neighbors, key=lambda k: linalg.norm(np.array(k)-np.array(key)))
-            return closest
-
-        with self._mem.read_transaction:
-            node = self._search_in_tree(key, self._root_node)
-            records = node.entries
-            rv = {r.key: self._get_value_from_record(r) for r in records}
-            assert isinstance(rv, dict)
-
-            c = closest(key, rv.keys())
-            return rv[c]
-     
-    def get_range(self, k_min, k_max, step=0.001, default={}) -> dict:
-        with self._mem.read_transaction:
-            all_records = []
-            k = k_min
-            while k <= k_max:
-                node = self._search_in_tree(k, self._root_node)
-                records = node.entries
-                
-                assert isinstance(node, (Node))
-                
-                all_records += records
-                
-                k = node.biggest_key + step
-                            
-            rv = {r.key: self._get_value_from_record(r) for r in all_records}
-            
-            assert isinstance(rv, dict)
-            return rv
-    
-class VectorSerializer(Serializer):
-    """
-    A serializer for vectors of 8 byte doubles.
-    """
-    __slots__ = []
-    
-    def serialize(self, obj: tuple, key_size: int) -> bytes:
-        return bytes(np.array(obj))
-
-    def deserialize(self, data: bytes) -> tuple:
-        return tuple(np.frombuffer(data, dtype=float))
-
-"""
-===========================
-    DEPRECATED!!!
-===========================
-"""
-
-def index(graph):
-    """
-    ===========================
-        DEPRECATED!!!
-    ===========================
-    
-    Get the index of the graph, as described in in Fonseca and Jorge 
-    "Indexing High-Dimensional Data for Content-Based Retrieval in Large Databases".
-    
-    Is the norm of the topology descriptor.
-    
-    This is used as the index of a B+-tree to find graphs with similar topology.
-    """
-    # Compute topology descriptor
-    d = descriptor(graph)
-    
-    # Get norm of eigenvalues (the reduction to 1 dimensions)
-    norm = linalg.norm(d)
-    
-    return norm
-
-def perturbe(index):
-    """
-    Add small random perturbation to avoid collisions
-    """   
-    epsilon = (2*random.random() - 1) / 100_000_000_000
-    return index + epsilon
