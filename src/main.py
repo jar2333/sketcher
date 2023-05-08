@@ -6,6 +6,7 @@ from numpy import argmax
 
 from extraction import extract_graph, plot_graph, get_line_strings, plot_line_strings, get_polygons, plot_polygons
 from database import open_database, query_database, close_database, descriptor
+from vision import get_image_line_strings, load_image
 from labels import LABELS
 
 """
@@ -164,7 +165,7 @@ def create_window():
                width=CANVAS_WIDTH, 
                height=CANVAS_HEIGHT
                )
-    c.grid(row = 1, column = 0, columnspan = 3, rowspan = 3)
+    c.grid(row = 2, column = 0, columnspan = 3, rowspan = 3)
 
     # Paint on canvas on mouse movement
     c.bind("<B1-Motion>", lambda e: paint(e, c))
@@ -174,13 +175,13 @@ def create_window():
 
     # Radio buttons for output window
     r1 = Radiobutton(master, text="Graph", variable=MODE, value=GRAPH_MODE)
-    r1.grid(row = 1, column = 4)
+    r1.grid(row = 1, column = 0)
 
     r2 = Radiobutton(master, text="Polygon", variable=MODE, value=POLYGON_MODE)
-    r2.grid(row = 2, column = 4)
+    r2.grid(row = 1, column = 1)
 
     r3 = Radiobutton(master, text="Linestring", variable=MODE, value=LINESTRING_MODE)
-    r3.grid(row = 3, column = 4)
+    r3.grid(row = 1, column = 2)
 
 """
 RUNNER

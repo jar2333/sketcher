@@ -1,10 +1,10 @@
 import cv2
 import matplotlib.pyplot as plt
 
-from src.extraction import snap_round, to_line_string
+from numpy import resize, array
+from shapely import LineString
 
-from numpy import resize
-
+DEFAULT_STEP = 40
 
 def load_image(filename):
     """
@@ -22,7 +22,10 @@ def display_image(img, text='test'):
 
     plt.show()
 
-def get_image_line_strings(img, step=40):
+def get_image_line_strings(img, step=DEFAULT_STEP):
+    """
+    Converts an image from disk to a list of line strings, for further processing.
+    """
     contours, _ = get_contours(img)
 
     line_strings = []
@@ -40,6 +43,9 @@ def get_image_line_strings(img, step=40):
     return line_strings
 
 def get_contours(img):
+    """
+    Retrieves the contours of the image.
+    """
     gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
 
     blur = cv2.medianBlur(gray, 7)
@@ -52,6 +58,21 @@ def get_contours(img):
     return contours, hierarchy
 
 def draw_contours(img, contours):
+    """
+    Draws the extracted contours of an image onto it.
+    """
     for i in range(len(contours)):
         img2 = cv2.drawContours(img.copy(), contours, i, (0,255,0), 3)
         display_image(img2)
+
+def snap_round(path_points, step=DEFAULT_STEP):
+    """
+    The snap round algorithm: line segments to a fixed precision grid.
+    """
+    return (array(path_points)//step)*step
+
+def to_line_string(path_points):
+    """
+    Converts a list of lists of control points to a shapely LineString
+    """
+    return LineString(path_points)
