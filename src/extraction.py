@@ -16,6 +16,12 @@ DEFAULT_STEP = 20
 ----------------------------
 """
 
+def label(graph):
+    """
+    Gets the graphs label.
+    """
+    return graph.graph['label']
+
 def extract_graph(paths, label, step=DEFAULT_STEP, check_area=True) -> nx.Graph:
     """
     Extract topology and geometry graph from source (image, label) pair.

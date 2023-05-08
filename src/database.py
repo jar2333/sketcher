@@ -135,8 +135,7 @@ def construct_database(descriptors, features):
 
 """
 ------------------------------
--- Database index 
--- (descriptor, serialization)
+-- Database keys (descriptor)
 ------------------------------
 """
 
